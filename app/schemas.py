@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel , EmailStr
 from datetime import datetime
 
 # Schemas para SiteBloqueado
@@ -30,3 +30,28 @@ class TentativaAcessoResponse(TentativaAcessoBase):
 
     class Config:
         orm_mode = True
+
+# Registro
+class UserCreate(BaseModel):
+    nome: str
+    email: EmailStr
+    senha: str
+
+# Retorno do usuário
+class UserOut(BaseModel):
+    id: int
+    nome: str
+    email: EmailStr
+
+    class Config:
+        from_attributes = True  # substitui orm_mode em Pydantic v2
+
+# Login
+class LoginSchema(BaseModel):
+    email: EmailStr
+    senha: str
+
+# Token JWT
+class Token(BaseModel):
+    access_token: str
+    token_type: str

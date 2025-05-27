@@ -1,10 +1,11 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    ADMIN_EMAIL: str = "seuemail@exemplo.com"
-    SMTP_HOST: str = "smtp.seuprovedor.com"
-    SMTP_PORT: int = 587
-    SMTP_USER: str = "usuario_smtp"
-    SMTP_PASSWORD: str = "senha_smtp"
+    ADMIN_EMAIL: str
+    SMTP_HOST: str
+    SMTP_PORT: int
+    SMTP_USER: str
+    SMTP_PASSWORD: str
+    model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
