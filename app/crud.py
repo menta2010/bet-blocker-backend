@@ -19,7 +19,7 @@ def list_sites(db: Session):
 # CRUD para TentativaAcesso
 def create_tentativa(db: Session, tentativa: schemas.TentativaAcessoCreate):
     db_tentativa = models.TentativaAcesso(
-        url=tentativa.url,
+        site_id=tentativa.site_id,  # Corrigido de url para site_id
         usuario_id=tentativa.usuario_id
     )
     db.add(db_tentativa)
@@ -30,13 +30,13 @@ def create_tentativa(db: Session, tentativa: schemas.TentativaAcessoCreate):
 def get_site_by_id(db: Session, site_id: int):
     return db.query(models.SiteBloqueado).filter(models.SiteBloqueado.id == site_id).first()
 
-
+# CRUD para Usuario
 def get_user_by_email(db: Session, email: str):
-    return db.query(models.User).filter(models.User.email == email).first()
+    return db.query(models.Usuario).filter(models.Usuario.email == email).first()
 
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_pw = hash_password(user.senha)
-    db_user = models.User(
+    db_user = models.Usuario(
         nome=user.nome,
         email=user.email,
         senha=hashed_pw
@@ -45,4 +45,3 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.commit()
     db.refresh(db_user)
     return db_user
-

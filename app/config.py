@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     SMTP_PORT: int
     SMTP_USER: str
     SMTP_PASSWORD: str
+    DATABASE_URL: str  # <-- Adicione esta linha
+    
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()

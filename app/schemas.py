@@ -1,4 +1,4 @@
-from pydantic import BaseModel , EmailStr
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
 # Schemas para SiteBloqueado
@@ -14,12 +14,12 @@ class SiteBloqueadoResponse(SiteBloqueadoBase):
     data_cadastro: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schemas para TentativaAcesso
 class TentativaAcessoBase(BaseModel):
-    url: str
-    usuario_id: str
+    site_id: int
+    usuario_id: int
 
 class TentativaAcessoCreate(TentativaAcessoBase):
     pass
@@ -29,7 +29,7 @@ class TentativaAcessoResponse(TentativaAcessoBase):
     data_hora: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Registro
 class UserCreate(BaseModel):
@@ -44,7 +44,7 @@ class UserOut(BaseModel):
     email: EmailStr
 
     class Config:
-        from_attributes = True  # substitui orm_mode em Pydantic v2
+        from_attributes = True
 
 # Login
 class LoginSchema(BaseModel):
@@ -55,3 +55,8 @@ class LoginSchema(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class TrocaSenha(BaseModel):
+    senha_atual: str
+    nova_senha: str
