@@ -6,7 +6,6 @@ from app.models import Usuario
 from app.services.email_service import send_email_notificacao
 from app.schemas import TrocaSenha, UserOut
 from app.core.security import verify_password, get_password_hash
-import asyncio
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
@@ -14,7 +13,7 @@ class TrocaEmailRequest(BaseModel):
     novo_email: EmailStr
 
 @router.patch("/{usuario_id}/email", status_code=200)
-def trocar_email(
+async def trocar_email(
     usuario_id: int,
     payload: TrocaEmailRequest,
     db: Session = Depends(get_db),
@@ -39,7 +38,7 @@ def trocar_email(
     db.commit()
 
     try:
-        send_email_notificacao(
+        await send_email_notificacao(
             email=email_antigo,
             nome=nome_antigo,
             mensagem="Seu e-mail foi alterado com sucesso para outro endereço."
@@ -51,7 +50,7 @@ def trocar_email(
 
 
 @router.patch("/{usuario_id}/senha", response_model=UserOut)
-def trocar_senha(
+async def trocar_senha(
     usuario_id: int,
     senha_data: TrocaSenha,
     db: Session = Depends(get_db)
@@ -68,7 +67,7 @@ def trocar_senha(
     db.refresh(usuario)
 
     try:
-        send_email_notificacao(
+        await send_email_notificacao(
             email=usuario.email,
             nome=usuario.nome,
             mensagem="Sua senha foi alterada com sucesso. Se não foi você, entre em contato com o suporte."
