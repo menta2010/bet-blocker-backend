@@ -9,6 +9,9 @@ class SiteBloqueado(Base):
     url = Column(String, unique=True, index=True)
     tipo = Column(String, default="apostas")
     data_cadastro = Column(DateTime, default=datetime.utcnow)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+
+    usuario = relationship("Usuario", back_populates="sites")
 
 class TentativaAcesso(Base):
     __tablename__ = "tentativas_acesso"
@@ -28,3 +31,4 @@ class Usuario(Base):
     senha = Column(String)
 
     tentativas = relationship("TentativaAcesso", back_populates="usuario")
+    sites = relationship("SiteBloqueado", back_populates="usuario", cascade="all, delete")
