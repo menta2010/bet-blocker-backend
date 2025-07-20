@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from app import schemas, crud, database
+
+from app import schemas, crud, database, models
 from app.models import Usuario
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, get_db
+
 
 router = APIRouter(prefix="/sites-bloqueados", tags=["sites-bloqueados"])
 
@@ -24,6 +26,10 @@ def listar_sites(
     usuario: Usuario = Depends(get_current_user)
 ):
     return crud.list_sites(db, usuario.id)
+
+@router.get("/todos", response_model=list[schemas.SiteBloqueadoResponse])
+def listar_todos_os_sites(db: Session = Depends(get_db)):
+    return db.query(models.SiteBloqueado).all()
 
 @router.put("/{site_id}", response_model=schemas.SiteBloqueadoResponse)
 def atualizar_site(

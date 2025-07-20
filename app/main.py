@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-from app.routes import sites, tentativas, auth, usuarios
+from app.routes import sites, tentativas, auth, usuarios, aconselhamento
 
 
 Base.metadata.create_all(bind=engine)
@@ -21,3 +21,4 @@ app.include_router(sites.router)
 app.include_router(tentativas.router)
 app.include_router(auth.router)
 app.include_router(usuarios.router)
+app.include_router(aconselhamento.router)

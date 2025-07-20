@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     SMTP_USER: str
     SMTP_PASSWORD: str
     DATABASE_URL: str  # <-- Adicione esta linha
+    openai_api_key: str 
     
     model_config = SettingsConfigDict(env_file=".env")
 

@@ -60,3 +60,10 @@ class Token(BaseModel):
 class TrocaSenha(BaseModel):
     senha_atual: str
     nova_senha: str
+
+class AconselhamentoRequest(BaseModel):
+    mensagem: str
+
+class AconselhamentoResponse(BaseModel):
+    resposta: str
+
