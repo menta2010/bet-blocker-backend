@@ -49,3 +49,17 @@ class Usuario(Base):
     tentativas = relationship("TentativaAcesso", back_populates="usuario", cascade="all, delete-orphan")
     sites = relationship("SiteBloqueado", back_populates="usuario", cascade="all, delete-orphan")
     aconselhamentos = relationship("Aconselhamento", back_populates="usuario", cascade="all, delete-orphan")
+    diarios = relationship("DiarioEmocional", back_populates="usuario", cascade="all, delete")
+
+
+class DiarioEmocional(Base):
+    __tablename__ = "diario_emocional"
+
+    id = Column(Integer, primary_key=True, index=True)
+    texto = Column(Text, nullable=False)
+    sentimento = Column(String)
+    resposta = Column(Text)
+    data = Column(DateTime, default=datetime.utcnow)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+
+    usuario = relationship("Usuario", back_populates="diarios")

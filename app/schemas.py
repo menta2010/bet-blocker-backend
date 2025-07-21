@@ -73,3 +73,13 @@ class AconselhamentoOut(BaseModel):
     resposta: str
     data: datetime
 
+class DiarioCreate(BaseModel):
+    texto: str
+
+class DiarioOut(BaseModel):
+    id: int
+    texto: str
+    sentimento: str
+    resposta: str
+    data: datetime
+
