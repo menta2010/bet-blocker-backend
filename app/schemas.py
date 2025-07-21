@@ -67,3 +67,9 @@ class AconselhamentoRequest(BaseModel):
 class AconselhamentoResponse(BaseModel):
     resposta: str
 
+class AconselhamentoOut(BaseModel):
+    id: int
+    mensagem: str
+    resposta: str
+    data: datetime
+

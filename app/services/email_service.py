@@ -31,8 +31,6 @@ async def send_email_alert(db: Session, tentativa):
         subtype="plain"
     )
 
-    
-
     fastmail = FastMail(mail_config)
     await fastmail.send_message(message)
 
