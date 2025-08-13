@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr , field_validator
+from pydantic import BaseModel, EmailStr , field_validator,constr
 from datetime import datetime
 
 # Schemas para SiteBloqueado
@@ -118,3 +118,27 @@ class EmergenciaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# --- Verificação de e-mail por código ---
+class RequestEmailCode(BaseModel):
+    email: EmailStr
+
+class VerifyEmailCode(BaseModel):
+    email: EmailStr
+    code: constr(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+class VerifyEmailResponse(BaseModel):
+    mensagem: str
+
+
+# --- Redefinição de senha por código ---
+class RequestPasswordResetCode(BaseModel):
+    email: EmailStr
+
+class ResetPasswordWithCode(BaseModel):
+    email: EmailStr
+    code: constr(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    nova_senha: constr(min_length=8)
+
+class ResetPasswordResponse(BaseModel):
+    mensagem: str

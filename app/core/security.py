@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from fastapi_mail import ConnectionConfig
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.config import settings
-
+import secrets
 # Configurações do token
 SECRET_KEY = "seu_segredo_super_seguro"  # depois vamos mover isso pro .env
 ALGORITHM = "HS256"
@@ -41,3 +41,10 @@ def get_mail_config():
     )
 
 get_password_hash = hash_password
+
+
+def generate_secure_token(nbytes: int = 32) -> str:
+    return secrets.token_urlsafe(nbytes)
+
+def minutes_from_now(mins: int) -> datetime:
+    return datetime.utcnow() + timedelta(minutes=mins)
