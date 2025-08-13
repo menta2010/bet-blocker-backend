@@ -55,3 +55,26 @@ async def send_email_notificacao(email: str, nome: str, mensagem: str):
 
     fastmail = FastMail(mail_config)
     await fastmail.send_message(message)
+
+async def send_email_emergencia(nomes_email: list[str], nome_usuario: str):
+    assunto = "Emergência - Ajuda solicitada"
+    corpo = f"""
+    Olá,
+
+    {nome_usuario} solicitou ajuda emergencial pelo aplicativo.
+
+    Recomendamos entrar em contato imediatamente para oferecer apoio.
+
+    Esta é uma mensagem automática.
+    """
+
+    mail_config = get_mail_config()
+    message = MessageSchema(
+        subject=assunto,
+        recipients=nomes_email,
+        body=corpo,
+        subtype="plain"
+    )
+
+    fastmail = FastMail(mail_config)
+    await fastmail.send_message(message)

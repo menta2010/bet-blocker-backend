@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status , BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from app.database import get_db
-from app.models import Usuario
-from app.services.email_service import send_email_notificacao
-from app.schemas import TrocaSenha, UserOut
+from app.models import Usuario , EmergenciaContato
+from app.services.email_service import send_email_notificacao 
+from app.schemas import TrocaSenha, UserOut, ContatoEmergenciaCreate, ContatoEmergenciaOut
 from app.core.security import verify_password, get_password_hash
+from typing import List
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
@@ -17,6 +18,7 @@ async def trocar_email(
     usuario_id: int,
     payload: TrocaEmailRequest,
     db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = BackgroundTasks
 ):
     novo_email = payload.novo_email
 
@@ -38,7 +40,8 @@ async def trocar_email(
     db.commit()
 
     try:
-        await send_email_notificacao(
+        background_tasks.add_task(
+            send_email_notificacao,
             email=email_antigo,
             nome=nome_antigo,
             mensagem="Seu e-mail foi alterado com sucesso para outro endereço."
@@ -53,7 +56,8 @@ async def trocar_email(
 async def trocar_senha(
     usuario_id: int,
     senha_data: TrocaSenha,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = BackgroundTasks
 ):
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario:
@@ -67,8 +71,9 @@ async def trocar_senha(
     db.refresh(usuario)
 
     try:
-        await send_email_notificacao(
-            email=usuario.email,
+        background_tasks.add_task(
+        send_email_notificacao,
+            email =usuario.email,
             nome=usuario.nome,
             mensagem="Sua senha foi alterada com sucesso. Se não foi você, entre em contato com o suporte."
         )
@@ -76,3 +81,48 @@ async def trocar_senha(
         print("Erro ao enviar notificação de alteração de senha:", str(e))
 
     return usuario
+
+@router.post("/{usuario_id}/contatos", response_model=ContatoEmergenciaOut, status_code=201)
+def adicionar_contato_emergencia(
+    usuario_id: int,
+    payload: ContatoEmergenciaCreate,
+    db: Session = Depends(get_db),
+):
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    # evita duplicados por e-mail
+    existe = (
+        db.query(EmergenciaContato)
+        .filter(EmergenciaContato.usuario_id == usuario_id, EmergenciaContato.email == payload.email)
+        .first()
+    )
+    if existe:
+        raise HTTPException(status_code=400, detail="Contato já cadastrado para esse usuário")
+
+    contato = EmergenciaContato(usuario_id=usuario_id, email=payload.email, nome=payload.nome)
+    db.add(contato)
+    db.commit()
+    db.refresh(contato)
+    return contato
+
+@router.get("/{usuario_id}/contatos", response_model=List[ContatoEmergenciaOut])
+def listar_contatos_emergencia(usuario_id: int, db: Session = Depends(get_db)):
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return usuario.contatos_emergencia
+
+@router.delete("/{usuario_id}/contatos/{contato_id}", status_code=204)
+def remover_contato_emergencia(usuario_id: int, contato_id: int, db: Session = Depends(get_db)):
+    contato = (
+        db.query(EmergenciaContato)
+        .filter(EmergenciaContato.id == contato_id, EmergenciaContato.usuario_id == usuario_id)
+        .first()
+    )
+    if not contato:
+        raise HTTPException(status_code=404, detail="Contato não encontrado")
+    db.delete(contato)
+    db.commit()
+    return None

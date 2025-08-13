@@ -12,7 +12,7 @@ def gerar_aconselhamento_ia(mensagem: str) -> str:
                 {"role": "system", "content": "Você é um conselheiro empático que ajuda pessoas viciadas em apostas a se sentirem acolhidas e motivadas a seguir em frente."},
                 {"role": "user", "content": mensagem}
             ],
-            max_tokens=150,
+            max_tokens=350,
             temperature=0.7
         )
         return response.choices[0].message.content
@@ -40,3 +40,24 @@ def analisar_texto_diario(texto: str) -> tuple[str, str]:
         return sentimento, resposta_ia
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao analisar diário: {str(e)}")
+    
+
+async def gerar_conselho_emergencial() -> dict:
+    prompt = (
+        "Imagine que um usuário está prestes a recair no vício de apostas. Dê uma mensagem curta de apoio emocional "
+        "e uma dica prática para ajudá-lo a resistir no momento de urgência."
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=150
+    )
+
+    content = response.choices[0].message.content
+    partes = content.split("\n", 1)
+    return {
+        "mensagem_apoio": partes[0].strip(),
+        "dica_rapida": partes[1].strip() if len(partes) > 1 else ""
+    }

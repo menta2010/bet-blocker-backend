@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     DATABASE_URL: str  # <-- Adicione esta linha
     openai_api_key: str 
+    OPENAI_MODEL_DIARIO: str
+    OPENAI_MODEL_CONSELHO: str 
     
     model_config = SettingsConfigDict(env_file=".env")
 

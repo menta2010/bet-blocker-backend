@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app import schemas, crud, database
+from app import schemas, crud
 from app.core.security import verify_password, create_access_token
 from app.schemas import UserOut
 from app.dependencies.auth import get_current_user
@@ -25,7 +25,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     if not user or not verify_password(form_data.password, user.senha):
         raise HTTPException(status_code=400, detail="Credenciais inválidas")
     
-    token = create_access_token({"sub": user.email})
+    token = create_access_token({"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer"}
 
 

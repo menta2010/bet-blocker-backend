@@ -43,13 +43,37 @@ def get_user_by_email(db: Session, email: str):
     return db.query(models.Usuario).filter(models.Usuario.email == email).first()
 
 def create_user(db: Session, user: schemas.UserCreate):
+    email_norm = user.email.lower().strip()
     hashed_pw = hash_password(user.senha)
     db_user = models.Usuario(
         nome=user.nome,
-        email=user.email,
-        senha=hashed_pw
+        email=email_norm,
+        senha=hashed_pw,
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+def add_contato_emergencia(db: Session, usuario_id: int, email: str):
+    contato = models.EmergenciaContato(usuario_id=usuario_id, email=email)
+    db.add(contato)
+    db.commit()
+    db.refresh(contato)
+    return contato
+
+def list_contatos_emergencia(db: Session, usuario_id: int):
+    return db.query(models.EmergenciaContato)\
+             .filter(models.EmergenciaContato.usuario_id == usuario_id)\
+             .all()
+
+def delete_contato_emergencia(db: Session, usuario_id: int, contato_id: int):
+    contato = db.query(models.EmergenciaContato)\
+                .filter(models.EmergenciaContato.id == contato_id,
+                        models.EmergenciaContato.usuario_id == usuario_id)\
+                .first()
+    if contato:
+        db.delete(contato)
+        db.commit()
+    return contato

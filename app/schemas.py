@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr , field_validator
 from datetime import datetime
 
 # Schemas para SiteBloqueado
@@ -37,6 +37,15 @@ class UserCreate(BaseModel):
     email: EmailStr
     senha: str
 
+    @field_validator("senha")
+    @classmethod
+    def senha_forte(cls, v: str):
+        if len(v) < 8:
+            raise ValueError("A senha deve ter pelo menos 8 caracteres.")
+        if v.isdigit() or v.isalpha():
+            raise ValueError("Use letras e números para uma senha mais segura.")
+        return v
+    
 # Retorno do usuário
 class UserOut(BaseModel):
     id: int
@@ -76,6 +85,13 @@ class AconselhamentoOut(BaseModel):
 class DiarioCreate(BaseModel):
     texto: str
 
+    @field_validator("texto")
+    @classmethod
+    def limitar_tamanho(cls, v: str):
+        if len(v) > 3000:
+            raise ValueError("Texto muito longo (máx 3000 caracteres).")
+        return v
+
 class DiarioOut(BaseModel):
     id: int
     texto: str
@@ -83,3 +99,22 @@ class DiarioOut(BaseModel):
     resposta: str
     data: datetime
 
+class ContatoEmergenciaCreate(BaseModel):
+    email: EmailStr
+    nome: str | None = None
+
+class ContatoEmergenciaOut(BaseModel):
+    id: int
+    email: EmailStr
+    nome: str | None = None
+    criado_em: datetime
+    class Config:
+        from_attributes = True
+
+class EmergenciaResponse(BaseModel):
+    mensagem: str
+    enviado_para: list[EmailStr]
+    data_hora: datetime
+
+    class Config:
+        from_attributes = True
