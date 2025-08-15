@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr , field_validator,constr
-from datetime import datetime
+from pydantic import BaseModel, EmailStr, field_validator, constr, Field, conint
+from datetime import  date, time,datetime
+from typing import Optional, List
 
 # Schemas para SiteBloqueado
 class SiteBloqueadoBase(BaseModel):
@@ -142,3 +143,63 @@ class ResetPasswordWithCode(BaseModel):
 
 class ResetPasswordResponse(BaseModel):
     mensagem: str
+
+
+# ============== DESAFIO DE ABSTINÊNCIA ==============
+class DesafioCreate(BaseModel):
+    dias_meta: conint(ge=1, le=365) = Field(..., description="Meta de dias (ex.: 7, 14, 30)")
+
+class DesafioOut(BaseModel):
+    id: int
+    data_inicio: date
+    dias_meta: int
+    streak_atual: int
+    ultimo_checkin: Optional[date] = None
+    concluido: bool
+    data_conclusao: Optional[date] = None
+    criado_em: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============== GATILHOS ==============
+class GatilhoBase(BaseModel):
+    nome: str
+    dias_da_semana: List[int] = Field(default_factory=list, description="0=Seg ... 6=Dom")
+    hora_inicio: time
+    hora_fim: time
+    ativo: bool = True
+
+class GatilhoCreate(GatilhoBase):
+    pass
+
+class GatilhoUpdate(BaseModel):
+    nome: Optional[str] = None
+    dias_da_semana: Optional[List[int]] = None
+    hora_inicio: Optional[time] = None
+    hora_fim: Optional[time] = None
+    ativo: Optional[bool] = None
+
+class GatilhoOut(GatilhoBase):
+    id: int
+    criado_em: datetime
+    class Config:
+        from_attributes = True
+
+
+# ============== PLANO DE DESINTOXICAÇÃO ==============
+class DetoxPlanoCreate(BaseModel):
+    titulo: str
+    objetivos: str
+    atividades_diarias: List[str] = Field(default_factory=list)
+    dicas: Optional[str] = None
+
+class DetoxPlanoOut(BaseModel):
+    id: int
+    titulo: str
+    objetivos: str
+    atividades_diarias: List[str]
+    dicas: Optional[str] = None
+    criado_em: datetime
+    atualizado_em: datetime

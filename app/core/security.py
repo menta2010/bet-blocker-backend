@@ -1,8 +1,7 @@
 from passlib.context import CryptContext
-from jose import JWTError, jwt
+from jose import jwt
 from datetime import datetime, timedelta
 from fastapi_mail import ConnectionConfig
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.config import settings
 import secrets
 # Configurações do token

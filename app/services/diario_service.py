@@ -3,7 +3,8 @@ from fastapi import HTTPException
 from app.config import settings
 from anyio import to_thread
 
-client = OpenAI(api_key=settings.openai_api_key)
+def _get_client() -> OpenAI:
+    return OpenAI(api_key=settings.openai_api_key)
 
 async def analisar_diario(texto: str) -> tuple[str, str]:
     prompt = (
@@ -14,6 +15,7 @@ async def analisar_diario(texto: str) -> tuple[str, str]:
     )
 
     try:
+        client = _get_client()
         resposta = await to_thread.run_sync(lambda: client.chat.completions.create(
         model=settings.OPENAI_MODEL_DIARIO,  
         messages=[{"role": "user", "content": prompt}],

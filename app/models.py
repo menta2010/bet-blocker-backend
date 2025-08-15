@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean,func 
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean,func ,Date, Time
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime , date
 from .database import Base
 
 class SiteBloqueado(Base):
@@ -52,6 +52,9 @@ class Usuario(Base):
     diarios = relationship("DiarioEmocional", back_populates="usuario", cascade="all, delete")
     contatos_emergencia = relationship("EmergenciaContato", back_populates="usuario", cascade="all, delete-orphan")
     email_codes = relationship("EmailVerificationCode",back_populates="user",cascade="all, delete-orphan")
+    desafios = relationship("DesafioAbstinencia", back_populates="usuario", cascade="all, delete")
+    gatilhos = relationship("Gatilho", back_populates="usuario", cascade="all, delete")
+    detox_planos = relationship("DetoxPlano", back_populates="usuario", cascade="all, delete")
 
 class DiarioEmocional(Base):
     __tablename__ = "diario_emocional"
@@ -97,3 +100,59 @@ class PasswordResetCode(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     user = relationship("Usuario", backref="password_codes")
+
+# --- GATILHOS ---
+class Gatilho(Base):
+    __tablename__ = "gatilhos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+
+    nome = Column(String, nullable=False)                 # ex.: "Noite", "Dia de pagamento"
+    # dias_da_semana: 0=Seg ... 6=Dom (para simplificar salvaremos como string CSV "0,1,6")
+    dias_da_semana = Column(String, default="", nullable=False)
+    hora_inicio = Column(Time, nullable=False)            # ex.: 20:00
+    hora_fim = Column(Time, nullable=False)               # ex.: 23:59
+    ativo = Column(Boolean, default=True, nullable=False)
+
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    usuario = relationship("Usuario", back_populates="gatilhos")
+
+# --- PLANO DE DESINTOXICAÇÃO ---
+class DetoxPlano(Base):
+    __tablename__ = "detox_planos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+
+    titulo = Column(String, nullable=False)               # ex.: "Plano de 14 dias"
+    objetivos = Column(Text, nullable=False)              # texto livre
+    atividades_diarias = Column(Text, nullable=False)     # pode ser JSON em texto
+    dicas = Column(Text, nullable=True)
+
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    usuario = relationship("Usuario", back_populates="detox_planos")
+
+    # Em Usuario, garanta que existe a relação:
+# desafios = relationship("DesafioAbstinencia", back_populates="usuario", cascade="all, delete-orphan")
+
+class DesafioAbstinencia(Base):
+    __tablename__ = "desafios_abstinencia"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+
+    # nomes que a rota/schemas usam
+    data_inicio = Column(Date, default=date.today, nullable=False)
+    dias_meta = Column(Integer, nullable=False)           # ex.: 7, 14, 30
+    streak_atual = Column(Integer, default=0, nullable=False)
+    ultimo_checkin = Column(Date, nullable=True)
+    concluido = Column(Boolean, default=False, nullable=False)
+    data_conclusao = Column(Date, nullable=True)
+
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    usuario = relationship("Usuario", back_populates="desafios")

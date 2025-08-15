@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-
 from app import schemas, crud, database, models
 from app.models import Usuario
-from app.dependencies.auth import get_current_user, get_db
+from app.dependencies.auth import get_current_user
+from app.database import get_db
 
 
 router = APIRouter(prefix="/sites-bloqueados", tags=["sites-bloqueados"])

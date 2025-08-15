@@ -6,6 +6,7 @@ from app.services.diario_service import analisar_diario
 from typing import List
 from app.dependencies.auth import get_current_user
 from app.database import get_db
+
 router = APIRouter(prefix="/diario", tags=["Diário Emocional"])
 
 @router.post("/", response_model=DiarioOut)

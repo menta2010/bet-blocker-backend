@@ -4,8 +4,14 @@ from app.config import settings
 
 client = OpenAI(api_key=settings.openai_api_key)
 
+
+def _get_client() -> OpenAI:
+    # instancia apenas no uso
+    return OpenAI(api_key=settings.openai_api_key)
+
 def gerar_aconselhamento_ia(mensagem: str) -> str:
     try:
+        client = _get_client()
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[

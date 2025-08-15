@@ -1,27 +1,41 @@
+# app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-from app.routes import sites, tentativas, auth, usuarios, aconselhamento
-from app.routes import diario_emocional
-from app.routes import emergencia
+from app import models  # 1) registra models
 
-
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)  # 2) cria tabelas
 
 app = FastAPI(title="Bet Blocker Backend")
 
-# Permitir acesso da API por qualquer origem (frontend, mobile etc.)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Pode trocar por ['http://localhost', 'https://seusite.com'] depois
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(sites.router)
-app.include_router(tentativas.router)
-app.include_router(auth.router)
-app.include_router(usuarios.router)
-app.include_router(aconselhamento.router)
-app.include_router(diario_emocional.router)
-app.include_router(emergencia.router)
+
+# 3) importa routers de forma segura
+import importlib
+
+ROUTES = [
+    "app.routes.sites",
+    "app.routes.tentativas",
+    "app.routes.auth",            # rotas de auth (login/register)
+    "app.routes.usuarios",
+    "app.routes.aconselhamento",
+    "app.routes.diario_emocional",
+    "app.routes.emergencia",
+    "app.routes.desafios",
+    "app.routes.gatilhos",
+    "app.routes.detox",
+]
+
+for mod_path in ROUTES:
+    try:
+        mod = importlib.import_module(mod_path)
+        app.include_router(mod.router)
+    except Exception as e:
+        print(f"[ROUTER ERRO] Falha ao importar {mod_path}: {e}")
+        raise

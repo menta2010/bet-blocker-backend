@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.schemas import AconselhamentoRequest, AconselhamentoResponse, AconselhamentoOut
-from app.dependencies.auth import get_current_user, get_db
+from app.dependencies.auth import get_current_user
+from app.database import get_db
 from app.models import Usuario, Aconselhamento
 from app.utils.ai_utils import gerar_aconselhamento_ia
 from typing import List
