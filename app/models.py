@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean,func ,Date, Time
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean,func ,Date, Time,UniqueConstraint,Numeric
 from sqlalchemy.orm import relationship
 from datetime import datetime , date
 from .database import Base
@@ -156,3 +156,23 @@ class DesafioAbstinencia(Base):
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     usuario = relationship("Usuario", back_populates="desafios")
+
+
+
+class UsuarioBaseline(Base):
+    __tablename__ = "usuarios_baseline"
+    __table_args__ = (UniqueConstraint("usuario_id", name="uq_baseline_usuario"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # hábitos declarados
+    tempo_diario_minutos = Column(Integer, nullable=True)    # ex.: 45
+    dias_por_semana = Column(Integer, nullable=True)         # ex.: 5
+    gasto_medio_dia = Column(Numeric(10, 2), nullable=True)  # ex.: 50.00
+    moeda = Column(String(8), nullable=True, default="BRL")
+
+    criado_em = Column(DateTime, server_default=func.now())
+    atualizado_em = Column(DateTime, onupdate=func.now(), server_default=func.now())
+
+    usuario = relationship("Usuario", backref="baseline", uselist=False)

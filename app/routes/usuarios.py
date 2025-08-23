@@ -4,9 +4,10 @@ from pydantic import BaseModel, EmailStr
 from app.database import get_db
 from app.models import Usuario , EmergenciaContato
 from app.services.email_service import send_email_notificacao 
-from app.schemas import TrocaSenha, UserOut, ContatoEmergenciaCreate, ContatoEmergenciaOut
+from app.schemas import TrocaSenha, UserOut, ContatoEmergenciaCreate, ContatoEmergenciaOut, BaselineOut,BaselineCreate,BaselineUpdate
 from app.core.security import verify_password, get_password_hash
 from typing import List
+from app import crud
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
@@ -17,8 +18,9 @@ class TrocaEmailRequest(BaseModel):
 async def trocar_email(
     usuario_id: int,
     payload: TrocaEmailRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks
+
 ):
     novo_email = payload.novo_email
 
@@ -56,8 +58,9 @@ async def trocar_email(
 async def trocar_senha(
     usuario_id: int,
     senha_data: TrocaSenha,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks
+
 ):
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario:
@@ -126,3 +129,41 @@ def remover_contato_emergencia(usuario_id: int, contato_id: int, db: Session = D
     db.delete(contato)
     db.commit()
     return None
+
+
+@router.get("/{usuario_id}/baseline", response_model= BaselineOut)
+def obter_baseline(usuario_id: int, db: Session = Depends(get_db)):
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    baseline = crud.get_baseline_by_user(db, usuario_id)
+    if not baseline:
+        raise HTTPException(status_code=404, detail="Baseline não encontrado")
+    return baseline
+
+@router.post("/{usuario_id}/baseline", response_model=BaselineOut, status_code=201)
+def criar_baseline(usuario_id: int, payload: BaselineCreate, db: Session = Depends(get_db)):
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    existente = crud.get_baseline_by_user(db, usuario_id)
+    if existente:
+        raise HTTPException(status_code=400, detail="Baseline já cadastrado para este usuário")
+
+    return crud.create_baseline(db, usuario_id, payload)
+
+@router.patch("/{usuario_id}/baseline", response_model=BaselineOut)
+def atualizar_baseline(usuario_id: int, payload: BaselineUpdate, db: Session = Depends(get_db)):
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    baseline = crud.get_baseline_by_user(db, usuario_id)
+    if not baseline:
+        # opcional: criar caso não exista
+        baseline = crud.create_baseline(db, usuario_id, BaselineCreate(**payload.dict()))
+        return baseline
+
+    return crud.update_baseline(db, baseline, payload)

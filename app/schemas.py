@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator, constr, Field, conint
+from pydantic import BaseModel, EmailStr, field_validator, constr, Field, conint,condecimal
 from datetime import  date, time,datetime
 from typing import Optional, List
 
@@ -203,3 +203,27 @@ class DetoxPlanoOut(BaseModel):
     dicas: Optional[str] = None
     criado_em: datetime
     atualizado_em: datetime
+
+
+
+# app/schemas.py
+from pydantic import BaseModel, conint, condecimal, Field
+
+class BaselineBase(BaseModel):
+    tempo_diario_minutos: conint(ge=0, le=24*60) | None = Field(default=None, description="Minutos por dia")
+    dias_por_semana: conint(ge=0, le=7) | None = Field(default=None, description="Dias por semana")
+    gasto_medio_dia: condecimal(max_digits=10, decimal_places=2) | None = Field(default=None)
+    moeda: str | None = "BRL"
+
+class BaselineCreate(BaselineBase):
+    pass
+
+class BaselineUpdate(BaselineBase):
+    pass
+
+class BaselineOut(BaselineBase):
+    id: int
+    usuario_id: int
+
+    class Config:
+        from_attributes = True

@@ -196,3 +196,32 @@ def validate_password_reset_code(db: Session, email: str, code: str) -> models.U
     rec.used = True
     db.commit()
     return user
+
+# app/crud.py
+from sqlalchemy.orm import Session
+from app import models, schemas
+
+def get_baseline_by_user(db: Session, usuario_id: int) -> models.UsuarioBaseline | None:
+    return db.query(models.UsuarioBaseline).filter(models.UsuarioBaseline.usuario_id == usuario_id).first()
+
+def create_baseline(db: Session, usuario_id: int, data: schemas.BaselineCreate) -> models.UsuarioBaseline:
+    baseline = models.UsuarioBaseline(
+        usuario_id=usuario_id,
+        tempo_diario_minutos=data.tempo_diario_minutos,
+        dias_por_semana=data.dias_por_semana,
+        gasto_medio_dia=data.gasto_medio_dia,
+        moeda=data.moeda or "BRL",
+    )
+    db.add(baseline)
+    db.commit()
+    db.refresh(baseline)
+    return baseline
+
+def update_baseline(db: Session, baseline: models.UsuarioBaseline, data: schemas.BaselineUpdate) -> models.UsuarioBaseline:
+    for field in ("tempo_diario_minutos", "dias_por_semana", "gasto_medio_dia", "moeda"):
+        val = getattr(data, field, None)
+        if val is not None:
+            setattr(baseline, field, val)
+    db.commit()
+    db.refresh(baseline)
+    return baseline
