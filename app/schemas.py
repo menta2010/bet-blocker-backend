@@ -206,9 +206,6 @@ class DetoxPlanoOut(BaseModel):
 
 
 
-# app/schemas.py
-from pydantic import BaseModel, conint, condecimal, Field
-
 class BaselineBase(BaseModel):
     tempo_diario_minutos: conint(ge=0, le=24*60) | None = Field(default=None, description="Minutos por dia")
     dias_por_semana: conint(ge=0, le=7) | None = Field(default=None, description="Dias por semana")
@@ -224,6 +221,19 @@ class BaselineUpdate(BaselineBase):
 class BaselineOut(BaselineBase):
     id: int
     usuario_id: int
+
+
+class MetricsOut(BaseModel):
+    streakDays: int
+    avoidedBets: int
+    moneySaved: float     # R$ acumulado
+    timeSavedMin: int     # minutos
+
+
+class CheckinTodayOut(BaseModel):
+    done: bool
+    checked_at: date | None = None   # evita colisão com o nome 'date'
+    streakDays: int
 
     class Config:
         from_attributes = True

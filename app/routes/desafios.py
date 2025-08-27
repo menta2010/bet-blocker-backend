@@ -48,7 +48,7 @@ def fazer_checkin(desafio_id: int,
         DesafioAbstinencia.usuario_id == usuario.id
     ).first()
     if not desafio:
-        raise HTTPException(status_code=404, detail="Desafio não encontrado.")
+        raise HTTPException(status_code=404, detail="Desafio não en                                                                                                                      contrado.")
 
     if desafio.concluido:
         raise HTTPException(status_code=400, detail="Desafio já concluído.")

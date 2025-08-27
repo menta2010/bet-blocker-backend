@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from . import models, schemas
 from app.core.security import hash_password
-from datetime import datetime , timedelta
+from datetime import datetime , timedelta , timezone, date
 import random
 
 # CRUD para SiteBloqueado
@@ -197,10 +197,6 @@ def validate_password_reset_code(db: Session, email: str, code: str) -> models.U
     db.commit()
     return user
 
-# app/crud.py
-from sqlalchemy.orm import Session
-from app import models, schemas
-
 def get_baseline_by_user(db: Session, usuario_id: int) -> models.UsuarioBaseline | None:
     return db.query(models.UsuarioBaseline).filter(models.UsuarioBaseline.usuario_id == usuario_id).first()
 
@@ -225,3 +221,82 @@ def update_baseline(db: Session, baseline: models.UsuarioBaseline, data: schemas
     db.commit()
     db.refresh(baseline)
     return baseline
+
+
+def _days_since(dt: datetime | None) -> int:
+    if not dt:
+        return 0
+    return max(0, (date.today() - dt.astimezone(timezone.utc).date()).days)
+
+def get_current_streak_days(usuario: models.Usuario) -> int:
+    """
+    Dias consecutivos desde o início da streak.
+    Inclui o dia de hoje se houve check-in hoje.
+    """
+    if not usuario.streak_started_at:
+        return 0
+
+    start = usuario.streak_started_at.astimezone(timezone.utc).date()
+    today = date.today()
+
+    base = (today - start).days
+    # garante pelo menos 1 dia quando o check-in de hoje foi feito
+    if usuario.last_checkin_date == today:
+        base = max(base, 1)
+
+    return max(0, base)
+
+def start_streak(db: Session, usuario: models.Usuario) -> models.Usuario:
+    # só inicia se não tiver ativa
+    if not usuario.streak_started_at:
+        usuario.streak_started_at = datetime.now(tz=timezone.utc)
+        db.add(usuario)
+        db.commit()
+        db.refresh(usuario)
+    return usuario
+
+def reset_streak(db: Session, usuario: models.Usuario) -> models.Usuario:
+    # ao “quebrar” streak: atualiza last/best e zera
+    current = get_current_streak_days(usuario)
+    if current > 0:
+        usuario.last_streak_days = current
+        if current > (usuario.best_streak_days or 0):
+            usuario.best_streak_days = current
+    usuario.streak_started_at = None
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+def has_checkin_today(usuario: models.Usuario) -> bool:
+    return bool(usuario.last_checkin_date == date.today())
+
+def do_daily_checkin(db: Session, usuario: models.Usuario) -> int:
+    """Registra o check-in do dia, atualizando a streak conforme continuidade."""
+    today = date.today()
+
+    # se já fez hoje, só retorna a streak atual
+    if usuario.last_checkin_date == today:
+        return get_current_streak_days(usuario)
+
+    # se nunca teve streak, inicia agora
+    if not usuario.streak_started_at:
+        usuario.streak_started_at = datetime.now(tz=timezone.utc)
+    else:
+        # se ficou 2+ dias sem check-in, considera streak quebrada e reinicia
+        if usuario.last_checkin_date and (today - usuario.last_checkin_date).days > 1:
+            current = get_current_streak_days(usuario)
+            if current > 0:
+                usuario.last_streak_days = current
+                if current > (usuario.best_streak_days or 0):
+                    usuario.best_streak_days = current
+            usuario.streak_started_at = datetime.now(tz=timezone.utc)
+
+    # marca último check-in como hoje
+    usuario.last_checkin_date = today
+
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+
+    return get_current_streak_days(usuario)

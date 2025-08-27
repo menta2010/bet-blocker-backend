@@ -45,6 +45,11 @@ class Usuario(Base):
     email = Column(String, unique=True, index=True)
     senha = Column(String)
     email_verificado = Column(Boolean, default=False, nullable=False)
+    streak_started_at = Column(DateTime, nullable=True)
+    best_streak_days = Column(Integer, nullable=False, default=0)
+    last_streak_days = Column(Integer, nullable=False, default=0)
+    last_checkin_date = Column(Date, nullable=True)
+    
 
     tentativas = relationship("TentativaAcesso", back_populates="usuario", cascade="all, delete-orphan")
     sites = relationship("SiteBloqueado", back_populates="usuario", cascade="all, delete-orphan")
