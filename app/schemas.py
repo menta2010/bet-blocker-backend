@@ -1,6 +1,10 @@
-from pydantic import BaseModel, EmailStr, field_validator, constr, Field, conint,condecimal
+from pydantic import BaseModel, EmailStr, field_validator, constr, Field, conint,condecimal,ConfigDict,RootModel
 from datetime import  date, time,datetime
-from typing import Optional, List
+from typing import Optional, List, Literal
+
+
+TargetType = Literal["streak", "money", "time_min"]
+ChallengeStatus = Literal["draft", "active", "completed", "abandoned"]
 
 # Schemas para SiteBloqueado
 class SiteBloqueadoBase(BaseModel):
@@ -246,3 +250,83 @@ class HistoryPoint(BaseModel):
 
 class HistoryOut(BaseModel):
     points: List[HistoryPoint]
+
+class ChallengeTemplateOut(BaseModel):
+    id: int
+    slug: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    target_type: TargetType
+    target_value: Optional[int] = None
+    starts_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# -------- Create --------
+class UserChallengeCreate(BaseModel):
+    template_id: Optional[int] = None
+
+    # para custom (quando não vem template_id)
+    title: Optional[str] = None
+    description: Optional[str] = None
+    target_type: Optional[TargetType] = None
+    target_value: Optional[int] = None
+
+    # modelo usa deadline_days (mantemos opcional)
+    deadline_days: Optional[int] = None
+
+
+# -------- Start (com baselines) --------
+class UserChallengeStart(BaseModel):
+    baseline_money: Optional[int] = None
+    baseline_time_min: Optional[int] = None
+    baseline_streak_days: Optional[int] = None
+
+
+# -------- Out --------
+class UserChallengeOut(BaseModel):
+    id: int
+    user_id: int
+
+    template_id: Optional[int] = None
+
+    title: str
+    description: Optional[str] = None
+
+    target_type: TargetType
+    target_value: int
+
+    deadline_days: Optional[int] = None
+    status: ChallengeStatus
+
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    abandoned_at: Optional[datetime] = None
+
+    # baselines expostos (read-only)
+    baseline_money: Optional[int] = None
+    baseline_time_min: Optional[int] = None
+    baseline_streak_days: Optional[int] = None
+
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserChallengesResponse(RootModel[List[UserChallengeOut]]):
+    pass
+
+
+# Para criar item de catálogo (template de desafio)
+class ChallengeTemplateCreate(BaseModel):
+    slug: str | None = None
+    title: str
+    description: str | None = None
+    target_type: TargetType           # "streak" | "money" | "time_min"
+    target_value: int | None = None   # opcional (o modelo permite NULL)
+    starts_at: datetime | None = None
+    expires_at: datetime | None = None

@@ -3,6 +3,7 @@ from . import models, schemas
 from app.core.security import hash_password
 from datetime import datetime , timedelta , timezone, date
 import random
+from fastapi import HTTPException
 
 # CRUD para SiteBloqueado
 
@@ -301,3 +302,127 @@ def do_daily_checkin(db: Session, usuario: models.Usuario) -> int:
     db.refresh(usuario)
 
     return get_current_streak_days(usuario)
+
+def list_active_templates(db: Session, today: date | None = None):
+    q = db.query(models.ChallengeTemplate).filter(models.ChallengeTemplate.is_active == True)
+    if today:
+        q = q.filter(
+            (models.ChallengeTemplate.starts_at == None) | (models.ChallengeTemplate.starts_at <= today)
+        ).filter(
+            (models.ChallengeTemplate.expires_at == None) | (models.ChallengeTemplate.expires_at >= today)
+        )
+    return q.order_by(models.ChallengeTemplate.created_at.desc()).all()
+
+
+def create_template(db: Session, payload: schemas.ChallengeTemplateCreate):
+    t = models.ChallengeTemplate(**payload.model_dump())
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t
+
+
+# --- User challenges ---
+
+def list_my_challenges(db: Session, user_id: int):
+    return (
+        db.query(models.UserChallenge)
+        .filter(models.UserChallenge.user_id == user_id)
+        .order_by(models.UserChallenge.created_at.desc())
+        .all()
+    )
+
+
+# -------- Criação --------
+def create_user_challenge(db: Session, user_id: int, payload: schemas.UserChallengeCreate):
+    # via template
+    if payload.template_id:
+        tpl = db.query(models.ChallengeTemplate).get(payload.template_id)
+        if not tpl:
+            raise HTTPException(status_code=404, detail="Template inexistente")
+
+        uc = models.UserChallenge(
+            user_id=user_id,
+            template_id=tpl.id,
+            title=tpl.title,
+            description=tpl.description,
+            target_type=tpl.target_type,
+            target_value=tpl.target_value or 1,
+            deadline_days=None,
+            status="draft",
+        )
+    else:
+        # custom obrigatório
+        if not (payload.title and payload.target_type and payload.target_value is not None):
+            raise HTTPException(status_code=400, detail="title, target_type e target_value são obrigatórios")
+        uc = models.UserChallenge(
+            user_id=user_id,
+            title=payload.title,
+            description=payload.description,
+            target_type=payload.target_type,
+            target_value=payload.target_value,
+            deadline_days=payload.deadline_days,
+            status="draft",
+        )
+
+    db.add(uc)
+    db.commit()
+    db.refresh(uc)
+    return uc
+
+
+# -------- Start (grava baselines) --------
+def start_user_challenge(db: Session, user_id: int, challenge_id: int, payload: schemas.UserChallengeStart | None):
+    uc = (
+        db.query(models.UserChallenge)
+        .filter(models.UserChallenge.id == challenge_id, models.UserChallenge.user_id == user_id)
+        .first()
+    )
+    if not uc:
+        raise HTTPException(status_code=404, detail="Challenge não encontrado")
+
+    if uc.status != "draft":
+        raise HTTPException(status_code=400, detail="Só é possível iniciar desafios em rascunho")
+
+    if payload:
+        uc.baseline_money = payload.baseline_money
+        uc.baseline_time_min = payload.baseline_time_min
+        uc.baseline_streak_days = payload.baseline_streak_days
+
+    uc.status = "active"
+    uc.started_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(uc)
+    return uc
+
+
+# -------- Completar / Abandonar --------
+def complete_user_challenge(db: Session, user_id: int, challenge_id: int):
+    uc = (
+        db.query(models.UserChallenge)
+        .filter(models.UserChallenge.id == challenge_id, models.UserChallenge.user_id == user_id)
+        .first()
+    )
+    if not uc:
+        raise HTTPException(status_code=404, detail="Challenge não encontrado")
+    uc.status = "completed"
+    uc.completed_at = datetime.utcnow()
+    db.commit()
+    db.refresh(uc)
+    return uc
+
+
+def abandon_user_challenge(db: Session, user_id: int, challenge_id: int):
+    uc = (
+        db.query(models.UserChallenge)
+        .filter(models.UserChallenge.id == challenge_id, models.UserChallenge.user_id == user_id)
+        .first()
+    )
+    if not uc:
+        raise HTTPException(status_code=404, detail="Challenge não encontrado")
+    uc.status = "abandoned"
+    uc.abandoned_at = datetime.utcnow()
+    db.commit()
+    db.refresh(uc)
+    return uc

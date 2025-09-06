@@ -1,7 +1,14 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean,func ,Date, Time,UniqueConstraint,Numeric
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean,func ,Date, Time,UniqueConstraint,Numeric,Enum as SAEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime , date
 from .database import Base
+
+ChallengeStatusEnum = SAEnum(
+    "draft", "active", "completed", "abandoned",
+    name="challenge_status_enum"
+)
+
+TargetTypeEnum = SAEnum("streak", "money", "time_min", name="challenge_target_type_enum")
 
 class SiteBloqueado(Base):
     __tablename__ = "sites_bloqueados"
@@ -181,3 +188,56 @@ class UsuarioBaseline(Base):
     atualizado_em = Column(DateTime, onupdate=func.now(), server_default=func.now())
 
     usuario = relationship("Usuario", backref="baseline", uselist=False)
+
+
+class ChallengeTemplate(Base):
+    __tablename__ = "challenge_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slug = Column(String(80), unique=True, nullable=True)
+    title = Column(String(120), nullable=False)
+    description = Column(Text, nullable=True)
+
+    target_type = Column(TargetTypeEnum, nullable=False)
+    target_value = Column(Integer, nullable=True)
+
+    starts_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class UserChallenge(Base):
+    __tablename__ = "user_challenges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    template_id = Column(Integer, ForeignKey("challenge_templates.id"), nullable=True)
+    template = relationship("ChallengeTemplate")
+
+    title = Column(String(120), nullable=False)
+    description = Column(Text, nullable=True)
+
+    target_type = Column(TargetTypeEnum, nullable=False)
+    target_value = Column(Integer, nullable=False)
+
+    # Observação: o modelo usa deadline_days (não deadline_at)
+    deadline_days = Column(Integer, nullable=True)
+
+    # Status agora SEM 'available'
+    status = Column(ChallengeStatusEnum, nullable=False, default="draft")
+
+    # datas de ciclo
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    abandoned_at = Column(DateTime, nullable=True)
+
+    # >>> Baselines gravados no start (novos campos)
+    baseline_money = Column(Integer, nullable=True)
+    baseline_time_min = Column(Integer, nullable=True)
+    baseline_streak_days = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
