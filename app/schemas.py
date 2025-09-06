@@ -237,3 +237,12 @@ class CheckinTodayOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class HistoryPoint(BaseModel):
+    date: date
+    avoidedBets: int
+    moneySaved: float
+    timeSavedMin: int
+
+class HistoryOut(BaseModel):
+    points: List[HistoryPoint]

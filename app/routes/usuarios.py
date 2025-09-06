@@ -1,15 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status , BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status , BackgroundTasks,Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from app.database import get_db
 from app.models import Usuario , EmergenciaContato
 from app.services.email_service import send_email_notificacao 
-from app.schemas import TrocaSenha, UserOut, ContatoEmergenciaCreate, ContatoEmergenciaOut, BaselineOut,BaselineCreate,BaselineUpdate,MetricsOut,CheckinTodayOut
+from app.schemas import TrocaSenha, UserOut, ContatoEmergenciaCreate, ContatoEmergenciaOut, BaselineOut,BaselineCreate,BaselineUpdate,MetricsOut,CheckinTodayOut,HistoryOut, HistoryPoint
 from app.core.security import verify_password, get_password_hash
 from typing import List
 from app import crud
-from datetime import datetime
+from datetime import datetime,date,timedelta
+
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
+
+
+def _days_since(dt: datetime | None) -> int:
+    if not dt:
+        return 0
+    return max(0, (date.today() - dt.date()).days)
+
 
 class TrocaEmailRequest(BaseModel):
     novo_email: EmailStr
@@ -177,26 +185,17 @@ def atualizar_baseline(usuario_id: int, payload: BaselineUpdate, db: Session = D
 
 @router.get("/{usuario_id}/metrics", response_model=MetricsOut)
 def get_user_metrics(usuario_id: int, db: Session = Depends(get_db)):
-    # 1) garante que o usuário existe
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    # 2) precisa ter baseline
     baseline = crud.get_baseline_by_user(db, usuario_id)
     if not baseline:
-        # Sem baseline não faz sentido mostrar métricas
         raise HTTPException(status_code=404, detail="Baseline não encontrado")
 
-    # 3) ---- CÁLCULOS SIMPLES (placeholder) ----
-    streak_days = crud.get_current_streak_days(usuario) 
-    # “apostas evitadas”: heurística simples usando frequência semanal
+    streak_days = crud.get_current_streak_days(usuario)
     avoided_bets = round((baseline.dias_por_semana or 0) * (streak_days / 7) * 2)
-
-    # dinheiro poupado = gasto_medio_dia * streak
     money_saved = round((baseline.gasto_medio_dia or 0.0) * streak_days, 2)
-
-    # tempo poupado = tempo_diario_minutos * streak
     time_saved_min = int((baseline.tempo_diario_minutos or 0) * streak_days)
 
     return MetricsOut(
@@ -205,6 +204,8 @@ def get_user_metrics(usuario_id: int, db: Session = Depends(get_db)):
         moneySaved=money_saved,
         timeSavedMin=time_saved_min,
     )
+
+# -------- streak / check-in --------
 
 @router.get("/{usuario_id}/streak", response_model=StreakOut)
 def get_streak(usuario_id: int, db: Session = Depends(get_db)):
@@ -246,26 +247,52 @@ def get_checkin_today(usuario_id: int, db: Session = Depends(get_db)):
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-
     done = crud.has_checkin_today(usuario)
     streak = crud.get_current_streak_days(usuario)
-
-    return CheckinTodayOut(
-        done=done,
-        date=usuario.last_checkin_date,
-        streakDays=streak,
-    )
+    return CheckinTodayOut(done=done, date=usuario.last_checkin_date, streakDays=streak)
 
 @router.post("/{usuario_id}/checkin", response_model=CheckinTodayOut, status_code=201)
 def do_checkin(usuario_id: int, db: Session = Depends(get_db)):
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-
     streak = crud.do_daily_checkin(db, usuario)
+    return CheckinTodayOut(done=True, date=usuario.last_checkin_date, streakDays=streak)
 
-    return CheckinTodayOut(
-        done=True,
-        date=usuario.last_checkin_date,
-        streakDays=streak,
-    )
+
+@router.get("/{usuario_id}/history", response_model=HistoryOut)
+def get_history(usuario_id: int, days: int = Query(7, ge=1, le=90), db: Session = Depends(get_db)):
+    usuario: Usuario | None = db.query(Usuario).filter_by(id=usuario_id).first()
+    if not usuario:
+        raise HTTPException(404, "Usuário não encontrado")
+
+    baseline = crud.get_baseline_by_user(db, usuario_id)
+    if not baseline:
+        # sem baseline não faz sentido calcular métricas
+        return HistoryOut(points=[])
+
+    # streak atual (em dias) e heurística simples:
+    streak_days = _days_since(usuario.streak_started_at)
+
+    # Série dos últimos N dias (mais antigo -> hoje)
+    start = date.today() - timedelta(days=days - 1)
+    points: list[HistoryPoint] = []
+
+    for i in range(days):
+        d = start + timedelta(days=i)
+        # “ativo” se o dia está dentro do intervalo do streak (contando desde hoje para trás)
+        # ex.: streak=3 → hoje, ontem, anteontem
+        active = (date.today() - d).days < streak_days
+
+        avoided = int((baseline.dias_por_semana or 0) / 7) if active else 0
+        money  = float(baseline.gasto_medio_dia or 0.0) if active else 0.0
+        time_m = int(baseline.tempo_diario_minutos or 0) if active else 0
+
+        points.append(HistoryPoint(
+            date=d,
+            avoidedBets=avoided,
+            moneySaved=round(money, 2),
+            timeSavedMin=time_m
+        ))
+
+    return HistoryOut(points=points)

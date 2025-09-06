@@ -226,28 +226,25 @@ def update_baseline(db: Session, baseline: models.UsuarioBaseline, data: schemas
 def _days_since(dt: datetime | None) -> int:
     if not dt:
         return 0
-    return max(0, (date.today() - dt.astimezone(timezone.utc).date()).days)
+    return max(0, (date.today() - dt.date()).days)
+
+# ----------------- Streak / Check-in -----------------
 
 def get_current_streak_days(usuario: models.Usuario) -> int:
     """
-    Dias consecutivos desde o início da streak.
-    Inclui o dia de hoje se houve check-in hoje.
+    Dias corridos desde streak_started_at.
+    Se fez check-in hoje, garante pelo menos 1.
     """
     if not usuario.streak_started_at:
         return 0
-
     start = usuario.streak_started_at.astimezone(timezone.utc).date()
     today = date.today()
-
     base = (today - start).days
-    # garante pelo menos 1 dia quando o check-in de hoje foi feito
     if usuario.last_checkin_date == today:
         base = max(base, 1)
-
     return max(0, base)
 
 def start_streak(db: Session, usuario: models.Usuario) -> models.Usuario:
-    # só inicia se não tiver ativa
     if not usuario.streak_started_at:
         usuario.streak_started_at = datetime.now(tz=timezone.utc)
         db.add(usuario)
@@ -256,7 +253,6 @@ def start_streak(db: Session, usuario: models.Usuario) -> models.Usuario:
     return usuario
 
 def reset_streak(db: Session, usuario: models.Usuario) -> models.Usuario:
-    # ao “quebrar” streak: atualiza last/best e zera
     current = get_current_streak_days(usuario)
     if current > 0:
         usuario.last_streak_days = current
@@ -272,27 +268,32 @@ def has_checkin_today(usuario: models.Usuario) -> bool:
     return bool(usuario.last_checkin_date == date.today())
 
 def do_daily_checkin(db: Session, usuario: models.Usuario) -> int:
-    """Registra o check-in do dia, atualizando a streak conforme continuidade."""
+    """
+    Registra o check-in do dia.
+    - Se ficou 2+ dias sem check-in, fecha a streak anterior (atualiza best/last) e reinicia.
+    - Atualiza last_checkin_date e retorna a streak atual.
+    """
     today = date.today()
 
-    # se já fez hoje, só retorna a streak atual
+    # já fez hoje → não muda nada
     if usuario.last_checkin_date == today:
         return get_current_streak_days(usuario)
 
-    # se nunca teve streak, inicia agora
+    # primeira vez
     if not usuario.streak_started_at:
         usuario.streak_started_at = datetime.now(tz=timezone.utc)
     else:
-        # se ficou 2+ dias sem check-in, considera streak quebrada e reinicia
+        # dias desde o último check-in
         if usuario.last_checkin_date and (today - usuario.last_checkin_date).days > 1:
+            # fechamos a streak anterior
             current = get_current_streak_days(usuario)
             if current > 0:
                 usuario.last_streak_days = current
                 if current > (usuario.best_streak_days or 0):
                     usuario.best_streak_days = current
+            # reinicia a streak a partir de hoje
             usuario.streak_started_at = datetime.now(tz=timezone.utc)
 
-    # marca último check-in como hoje
     usuario.last_checkin_date = today
 
     db.add(usuario)
