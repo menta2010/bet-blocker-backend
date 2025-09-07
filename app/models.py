@@ -1,12 +1,16 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean,func ,Date, Time,UniqueConstraint,Numeric,Enum as SAEnum
 from sqlalchemy.orm import relationship
-from datetime import datetime , date
+from datetime import datetime , date,timezone
 from .database import Base
 
 ChallengeStatusEnum = SAEnum(
     "draft", "active", "completed", "abandoned",
     name="challenge_status_enum"
 )
+
+def utcnow():
+    """Datetime aware em UTC (para defaults)."""
+    return datetime.now(timezone.utc)  # 🛠️
 
 TargetTypeEnum = SAEnum("streak", "money", "time_min", name="challenge_target_type_enum")
 
@@ -16,7 +20,8 @@ class SiteBloqueado(Base):
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String, index=True)
     tipo = Column(String, default="apostas")
-    data_cadastro = Column(DateTime, default=datetime.utcnow)
+    data_cadastro = Column(DateTime(timezone=True), default=utcnow)  
+
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
 
     usuario = relationship("Usuario", back_populates="sites")
@@ -28,7 +33,7 @@ class TentativaAcesso(Base):
     id = Column(Integer, primary_key=True, index=True)
     site_id = Column(Integer, ForeignKey("sites_bloqueados.id"))
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
-    data_hora = Column(DateTime, default=datetime.utcnow)
+    data_hora = Column(DateTime(timezone=True), default=utcnow)  # 🛠️
 
     usuario = relationship("Usuario", back_populates="tentativas")
 
@@ -39,7 +44,7 @@ class Aconselhamento(Base):
     id = Column(Integer, primary_key=True, index=True)
     mensagem = Column(Text, nullable=False)
     resposta = Column(Text, nullable=False)
-    data = Column(DateTime, default=datetime.utcnow)
+    data = Column(DateTime(timezone=True), default=utcnow)  # 🛠️
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
 
     usuario = relationship("Usuario", back_populates="aconselhamentos")
@@ -52,7 +57,7 @@ class Usuario(Base):
     email = Column(String, unique=True, index=True)
     senha = Column(String)
     email_verificado = Column(Boolean, default=False, nullable=False)
-    streak_started_at = Column(DateTime, nullable=True)
+    streak_started_at = Column(DateTime(timezone=True), nullable=True)  # 🛠️
     best_streak_days = Column(Integer, nullable=False, default=0)
     last_streak_days = Column(Integer, nullable=False, default=0)
     last_checkin_date = Column(Date, nullable=True)
@@ -74,7 +79,7 @@ class DiarioEmocional(Base):
     texto = Column(Text, nullable=False)
     sentimento = Column(String)
     resposta = Column(Text)
-    data = Column(DateTime, default=datetime.utcnow)
+    data = Column(DateTime(timezone=True), default=utcnow)  # 🛠️
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     usuario = relationship("Usuario", back_populates="diarios")
 
@@ -85,7 +90,7 @@ class EmergenciaContato(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
     email = Column(String, nullable=False)
     nome = Column(String, nullable=True)
-    criado_em = Column(DateTime, default=datetime.utcnow)
+    criado_em = Column(DateTime(timezone=True), default=utcnow, nullable=False)  # 🛠️
 
     usuario = relationship("Usuario", back_populates="contatos_emergencia")
 
@@ -94,9 +99,10 @@ class EmailVerificationCode(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), index=True, nullable=False)
     code = Column(String(6), index=True, nullable=False)  
-    expires_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)  # 🛠️
     used = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)  # 🛠️
+
 
     user = relationship("Usuario", back_populates="email_codes")
 
@@ -107,9 +113,9 @@ class PasswordResetCode(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
     code = Column(String(6), nullable=False, index=True)
-    expires_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)  # 🛠️
     used = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)  # 🛠️
 
     user = relationship("Usuario", backref="password_codes")
 
@@ -127,7 +133,7 @@ class Gatilho(Base):
     hora_fim = Column(Time, nullable=False)               # ex.: 23:59
     ativo = Column(Boolean, default=True, nullable=False)
 
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    criado_em = Column(DateTime(timezone=True), default=utcnow, nullable=False)  # 🛠️
 
     usuario = relationship("Usuario", back_populates="gatilhos")
 
@@ -143,8 +149,9 @@ class DetoxPlano(Base):
     atividades_diarias = Column(Text, nullable=False)     # pode ser JSON em texto
     dicas = Column(Text, nullable=True)
 
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
-    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    criado_em = Column(DateTime(timezone=True), default=utcnow, nullable=False)  # 🛠️
+    atualizado_em = Column(DateTime(timezone=True), default=utcnow,
+                           onupdate=utcnow, nullable=False)  # 🛠️
 
     usuario = relationship("Usuario", back_populates="detox_planos")
 
@@ -165,7 +172,7 @@ class DesafioAbstinencia(Base):
     concluido = Column(Boolean, default=False, nullable=False)
     data_conclusao = Column(Date, nullable=True)
 
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    criado_em = Column(DateTime(timezone=True), default=utcnow, nullable=False)  # 🛠️
 
     usuario = relationship("Usuario", back_populates="desafios")
 
@@ -184,8 +191,9 @@ class UsuarioBaseline(Base):
     gasto_medio_dia = Column(Numeric(10, 2), nullable=True)  # ex.: 50.00
     moeda = Column(String(8), nullable=True, default="BRL")
 
-    criado_em = Column(DateTime, server_default=func.now())
-    atualizado_em = Column(DateTime, onupdate=func.now(), server_default=func.now())
+    criado_em = Column(DateTime(timezone=True), server_default=func.now())  # 🛠️
+    atualizado_em = Column(DateTime(timezone=True), onupdate=func.now(),
+                           server_default=func.now())  # 🛠️
 
     usuario = relationship("Usuario", backref="baseline", uselist=False)
 
@@ -201,18 +209,18 @@ class ChallengeTemplate(Base):
     target_type = Column(TargetTypeEnum, nullable=False)
     target_value = Column(Integer, nullable=True)
 
-    starts_at = Column(DateTime, nullable=True)
-    expires_at = Column(DateTime, nullable=True)
+    starts_at = Column(DateTime(timezone=True), nullable=True)  # 🛠️
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # 🛠️
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)  # 🛠️
+    updated_at = Column(DateTime(timezone=True), default=utcnow,
+                        onupdate=utcnow, nullable=False)  # 🛠️
 
 class UserChallenge(Base):
     __tablename__ = "user_challenges"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
 
     template_id = Column(Integer, ForeignKey("challenge_templates.id"), nullable=True)
     template = relationship("ChallengeTemplate")
@@ -230,14 +238,15 @@ class UserChallenge(Base):
     status = Column(ChallengeStatusEnum, nullable=False, default="draft")
 
     # datas de ciclo
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    abandoned_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)   # 🛠️
+    completed_at = Column(DateTime(timezone=True), nullable=True) # 🛠️
+    abandoned_at = Column(DateTime(timezone=True), nullable=True) # 🛠️
 
     # >>> Baselines gravados no start (novos campos)
     baseline_money = Column(Integer, nullable=True)
     baseline_time_min = Column(Integer, nullable=True)
     baseline_streak_days = Column(Integer, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)  # 🛠️
+    updated_at = Column(DateTime(timezone=True), default=utcnow,
+                        onupdate=utcnow, nullable=False)  # 🛠️

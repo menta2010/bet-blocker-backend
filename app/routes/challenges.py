@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import date
+from datetime import datetime, timezone  # 🛠️ usar timezone-aware
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app import schemas, models, crud
@@ -42,9 +42,11 @@ def create_user_challenge(
         tpl = db.query(models.ChallengeTemplate).get(payload.template_id)
         if not tpl:
             raise HTTPException(status_code=404, detail="Template não encontrado")
-        today = date.today()
-        # se você tem flags de ativação, mantenha esta checagem
-        if (tpl.starts_at and tpl.starts_at > today) or (tpl.expires_at and tpl.expires_at < today):
+
+        # 🛠️ agora timezone-aware para bater com DateTime(timezone=True)
+        now = datetime.now(timezone.utc)
+
+        if (tpl.starts_at and tpl.starts_at > now) or (tpl.expires_at and tpl.expires_at < now):
             raise HTTPException(status_code=400, detail="Template indisponível/expirado")
 
     uc = crud.create_user_challenge(db, user.id, payload)

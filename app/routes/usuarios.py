@@ -8,15 +8,9 @@ from app.schemas import TrocaSenha, UserOut, ContatoEmergenciaCreate, ContatoEme
 from app.core.security import verify_password, get_password_hash
 from typing import List
 from app import crud
-from datetime import datetime,date,timedelta
+from datetime import datetime,date,timedelta,timezone
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
-
-
-def _days_since(dt: datetime | None) -> int:
-    if not dt:
-        return 0
-    return max(0, (date.today() - dt.date()).days)
 
 
 class TrocaEmailRequest(BaseModel):
@@ -249,7 +243,7 @@ def get_checkin_today(usuario_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     done = crud.has_checkin_today(usuario)
     streak = crud.get_current_streak_days(usuario)
-    return CheckinTodayOut(done=done, date=usuario.last_checkin_date, streakDays=streak)
+    return CheckinTodayOut(done=done, checked_at=usuario.last_checkin_date, streakDays=streak)
 
 @router.post("/{usuario_id}/checkin", response_model=CheckinTodayOut, status_code=201)
 def do_checkin(usuario_id: int, db: Session = Depends(get_db)):
@@ -257,7 +251,8 @@ def do_checkin(usuario_id: int, db: Session = Depends(get_db)):
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     streak = crud.do_daily_checkin(db, usuario)
-    return CheckinTodayOut(done=True, date=usuario.last_checkin_date, streakDays=streak)
+    return CheckinTodayOut(done=True, checked_at=usuario.last_checkin_date, streakDays=streak)
+
 
 
 @router.get("/{usuario_id}/history", response_model=HistoryOut)
@@ -272,17 +267,18 @@ def get_history(usuario_id: int, days: int = Query(7, ge=1, le=90), db: Session 
         return HistoryOut(points=[])
 
     # streak atual (em dias) e heurística simples:
-    streak_days = _days_since(usuario.streak_started_at)
+    streak_days = crud.get_current_streak_days(usuario)
 
-    # Série dos últimos N dias (mais antigo -> hoje)
-    start = date.today() - timedelta(days=days - 1)
+    last = usuario.last_checkin_date or crud.today_utc()
+    # se tiver streak>0, o início é "last - (streak_days-1)"
+    streak_start = last - timedelta(days=max(0, streak_days - 1))
+
+    start = crud.today_utc() - timedelta(days=days - 1)
     points: list[HistoryPoint] = []
 
     for i in range(days):
         d = start + timedelta(days=i)
-        # “ativo” se o dia está dentro do intervalo do streak (contando desde hoje para trás)
-        # ex.: streak=3 → hoje, ontem, anteontem
-        active = (date.today() - d).days < streak_days
+        active = (streak_days > 0) and (streak_start <= d <= last)
 
         avoided = int((baseline.dias_por_semana or 0) / 7) if active else 0
         money  = float(baseline.gasto_medio_dia or 0.0) if active else 0.0

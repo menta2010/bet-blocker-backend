@@ -17,6 +17,16 @@ def get_site_by_url(db: Session, url: str, usuario_id: int):
         .first()
     )
 
+def today_utc() -> date:
+    """Retorna a data de hoje em UTC."""
+    return datetime.now(timezone.utc).date()
+
+def _days_since(dt: datetime | None) -> int:
+    if not dt:
+        return 0
+    # usar hoje em UTC para diferenças
+    return max(0, (today_utc() - dt.date()).days)
+
 def create_site(db: Session, site: schemas.SiteBloqueadoCreate, usuario_id: int):
     db_site = models.SiteBloqueado(
         url=site.url,
@@ -87,7 +97,7 @@ def delete_contato_emergencia(db: Session, usuario_id: int, contato_id: int):
 
 def create_email_verification_code(db: Session, user_id: int, minutes_valid: int = 15) -> models.EmailVerificationCode:
     code = _generate_6digit_code()
-    expires_at = datetime.utcnow() + timedelta(minutes=minutes_valid)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=minutes_valid)
 
     # invalida códigos anteriores não usados (opcional)
     db.query(models.EmailVerificationCode).filter(
@@ -117,7 +127,7 @@ def validate_email_verification_code(db: Session, email: str, code: str) -> mode
             models.EmailVerificationCode.user_id == user.id,
             models.EmailVerificationCode.code == code,
             models.EmailVerificationCode.used == False,
-            models.EmailVerificationCode.expires_at > datetime.utcnow(),
+            models.EmailVerificationCode.expires_at > datetime.now(timezone.utc),
         )
         .order_by(models.EmailVerificationCode.id.desc())
         .first()
@@ -137,7 +147,7 @@ def verify_email_with_code(db: Session, user: models.Usuario, code: str) -> bool
             models.EmailVerificationCode.user_id == user.id,
             models.EmailVerificationCode.code == code,
             models.EmailVerificationCode.used == False,
-            models.EmailVerificationCode.expires_at > datetime.utcnow(),
+            models.EmailVerificationCode.expires_at >datetime.now(timezone.utc),
         )
         .first()
     )
@@ -156,7 +166,7 @@ def verify_email_with_code(db: Session, user: models.Usuario, code: str) -> bool
 # ====== PASSWORD RESET ======
 def create_password_reset_code(db: Session, user_id: int, minutes_valid: int = 15) -> models.PasswordResetCode:
     code = _generate_6digit_code()
-    expires_at = datetime.utcnow() + timedelta(minutes=minutes_valid)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=minutes_valid)
 
     # invalida códigos anteriores
     db.query(models.PasswordResetCode).filter(
@@ -186,7 +196,7 @@ def validate_password_reset_code(db: Session, email: str, code: str) -> models.U
             models.PasswordResetCode.user_id == user.id,
             models.PasswordResetCode.code == code,
             models.PasswordResetCode.used == False,
-            models.PasswordResetCode.expires_at > datetime.utcnow(),
+            models.PasswordResetCode.expires_at > datetime.now(timezone.utc),
         )
         .order_by(models.PasswordResetCode.id.desc())
         .first()
@@ -224,26 +234,22 @@ def update_baseline(db: Session, baseline: models.UsuarioBaseline, data: schemas
     return baseline
 
 
-def _days_since(dt: datetime | None) -> int:
-    if not dt:
-        return 0
-    return max(0, (date.today() - dt.date()).days)
-
 # ----------------- Streak / Check-in -----------------
 
 def get_current_streak_days(usuario: models.Usuario) -> int:
     """
-    Dias corridos desde streak_started_at.
-    Se fez check-in hoje, garante pelo menos 1.
+    Dias consecutivos de streak, contando de streak_started_at ATÉ o último dia com check-in (inclusivo).
+    Ex.: start=2025-09-01, last=2025-09-02 -> 2 dias.
     """
-    if not usuario.streak_started_at:
+    if not usuario.streak_started_at or not usuario.last_checkin_date:
         return 0
-    start = usuario.streak_started_at.astimezone(timezone.utc).date()
-    today = date.today()
-    base = (today - start).days
-    if usuario.last_checkin_date == today:
-        base = max(base, 1)
-    return max(0, base)
+
+    start = usuario.streak_started_at.date()  # já é timezone-aware na criação
+    last  = usuario.last_checkin_date         # Date (não datetime)
+
+    # inclusivo: +1
+    days = (last - start).days + 1
+    return max(0, days)
 
 def start_streak(db: Session, usuario: models.Usuario) -> models.Usuario:
     if not usuario.streak_started_at:
@@ -266,7 +272,7 @@ def reset_streak(db: Session, usuario: models.Usuario) -> models.Usuario:
     return usuario
 
 def has_checkin_today(usuario: models.Usuario) -> bool:
-    return bool(usuario.last_checkin_date == date.today())
+    return bool(usuario.last_checkin_date == today_utc())
 
 def do_daily_checkin(db: Session, usuario: models.Usuario) -> int:
     """
@@ -274,7 +280,7 @@ def do_daily_checkin(db: Session, usuario: models.Usuario) -> int:
     - Se ficou 2+ dias sem check-in, fecha a streak anterior (atualiza best/last) e reinicia.
     - Atualiza last_checkin_date e retorna a streak atual.
     """
-    today = date.today()
+    today = today_utc()
 
     # já fez hoje → não muda nada
     if usuario.last_checkin_date == today:
@@ -303,13 +309,13 @@ def do_daily_checkin(db: Session, usuario: models.Usuario) -> int:
 
     return get_current_streak_days(usuario)
 
-def list_active_templates(db: Session, today: date | None = None):
-    q = db.query(models.ChallengeTemplate).filter(models.ChallengeTemplate.is_active == True)
-    if today:
+def list_active_templates(db: Session, now: datetime | None = None):
+    q = db.query(models.ChallengeTemplate)
+    if now:
         q = q.filter(
-            (models.ChallengeTemplate.starts_at == None) | (models.ChallengeTemplate.starts_at <= today)
+            (models.ChallengeTemplate.starts_at == None) | (models.ChallengeTemplate.starts_at <= now)
         ).filter(
-            (models.ChallengeTemplate.expires_at == None) | (models.ChallengeTemplate.expires_at >= today)
+            (models.ChallengeTemplate.expires_at == None) | (models.ChallengeTemplate.expires_at >= now)
         )
     return q.order_by(models.ChallengeTemplate.created_at.desc()).all()
 
@@ -390,7 +396,7 @@ def start_user_challenge(db: Session, user_id: int, challenge_id: int, payload: 
         uc.baseline_streak_days = payload.baseline_streak_days
 
     uc.status = "active"
-    uc.started_at = datetime.utcnow()
+    uc.started_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(uc)
@@ -407,7 +413,7 @@ def complete_user_challenge(db: Session, user_id: int, challenge_id: int):
     if not uc:
         raise HTTPException(status_code=404, detail="Challenge não encontrado")
     uc.status = "completed"
-    uc.completed_at = datetime.utcnow()
+    uc.completed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(uc)
     return uc
@@ -422,7 +428,10 @@ def abandon_user_challenge(db: Session, user_id: int, challenge_id: int):
     if not uc:
         raise HTTPException(status_code=404, detail="Challenge não encontrado")
     uc.status = "abandoned"
-    uc.abandoned_at = datetime.utcnow()
+    uc.abandoned_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(uc)
     return uc
+
+def list_catalog(db: Session):
+    return list_active_templates(db, datetime.now(timezone.utc))
